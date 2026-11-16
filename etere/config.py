@@ -20,7 +20,7 @@ DEFAULTS = {
     # Quanto ripulire l'immagine: 0 = grezza, 1 = molto pulita
     "CLEAN": "0.6",
     # Come guardare il segnale: spettro | variazioni | intensita | mix
-    "VIEW": "spettro",
+    "VIEW": "variazioni",
     # Dithering: floyd (morbido) | bayer (a reticolo, tipo incisione)
     "DITHER": "floyd",
     # Versione del pannello: V2 | V3 | V4 (vedi etichetta sul retro)

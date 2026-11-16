@@ -139,7 +139,7 @@ un lettore di SD.
 | `EXPOSURE_SECONDS` | `10` | secondi di ascolto tra uno scatto e l'altro |
 | `FIRST_EXPOSURE_SECONDS` | `5` | esposizione del primo scatto |
 | `CLEAN` | `0.6` | 0 = immagine grezza, 1 = molto pulita |
-| `VIEW` | `spettro` | `spettro` = il segnale così com'è; `variazioni` = solo i cambiamenti nel tempo (più forte = bianco, più debole = nero); `intensita` = quanto cambia (fermo = nero, evento = bianco); `mix` = metà spettro e metà intensità |
+| `VIEW` | `variazioni` | `spettro` = il segnale così com'è; `variazioni` = solo i cambiamenti nel tempo (più forte = bianco, più debole = nero); `intensita` = quanto cambia (fermo = nero, evento = bianco); `mix` = metà spettro e metà intensità |
 | `DITHER` | `floyd` | `floyd` = morbido; `bayer` = a reticolo, tipo incisione |
 | `EPD` | `V3` | versione del pannello: V2, V3, V4 |
 | `INVERT` | `0` | 1 = inverte bianco e nero |

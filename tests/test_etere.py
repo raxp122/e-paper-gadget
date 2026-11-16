@@ -187,6 +187,54 @@ class MandelbrotTest(unittest.TestCase):
             self.assertTrue(((g >= 0) & (g <= 1)).all())
 
 
+class FotoTest(unittest.TestCase):
+    def _jpeg(self, size, orientation=None):
+        import io
+        from PIL import Image
+        im = Image.new("RGB", size, (120, 120, 120))
+        buf = io.BytesIO()
+        if orientation:
+            ex = im.getexif()
+            ex[0x0112] = orientation
+            im.save(buf, "JPEG", exif=ex)
+        else:
+            im.save(buf, "JPEG")
+        return buf.getvalue()
+
+    def test_elabora(self):
+        from apps import foto
+        for fit in foto.FITS:
+            for method in ("floyd", "bayer"):
+                img = foto.process(self._jpeg((3000, 4000), 6), fit, method)
+                self.assertEqual((img.size, img.mode), ((250, 122), "1"))
+
+    def test_file_non_valido(self):
+        from apps import foto
+        with self.assertRaises(foto.PhotoError):
+            foto.process(b"non sono una foto")
+
+    def test_salva_e_mostra_sovrascrivendo(self):
+        from apps import foto
+        d = tempfile.mkdtemp()
+        conf = os.path.join(d, "etere.conf")
+        open(conf, "w").close()
+        cfg = config.Config(path=conf)
+        for _ in range(3):
+            foto.save(cfg, foto.process(self._jpeg((800, 600))))
+        self.assertEqual(sorted(os.listdir(d)), ["etere-foto.png", "etere.conf"])
+        img, wait = foto.FotoApp(cfg).frame()
+        self.assertEqual(img.size, (250, 122))
+
+    def test_multipart(self):
+        import web
+        body = (b"--XX\r\nContent-Disposition: form-data; name=\"fit\"\r\n\r\nintera\r\n"
+                b"--XX\r\nContent-Disposition: form-data; name=\"foto\"; filename=\"a.jpg\"\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n\x00\x01\r\n\xffDATA\r\n--XX--\r\n")
+        f = web.parse_multipart("multipart/form-data; boundary=XX", body)
+        self.assertEqual(f["fit"], b"intera")
+        self.assertEqual(f["foto"], b"\x00\x01\r\n\xffDATA")
+
+
 class WebTest(unittest.TestCase):
     def test_pagina_e_impostazioni(self):
         import web

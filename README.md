@@ -13,8 +13,9 @@ lampeggia**: l'ultima immagine resta sull'e-paper finché non lo riaccendi.
 
 | App | Cosa fa |
 |---|---|
-| `mandelbrot` (predefinita) | **Viaggio nel frattale.** Ogni 30 secondi scende più in profondità nell'insieme di Mandelbrot, fino a ingrandimenti di centinaia di miliardi. Un "pilota automatico" sceglie a ogni passo un punto sul bordo del frattale, quindi ogni accensione è un viaggio diverso. Stili: `incisione`, `china`, `chiaroscuro`. |
+| `mandelbrot` (predefinita) | **Viaggio nel frattale.** Ogni minuto (o appena pronto, se il calcolo dura di più) scende più in profondità nell'insieme di Mandelbrot, fino a ingrandimenti di centinaia di miliardi. Un "pilota automatico" sceglie a ogni passo un punto sul bordo del frattale, quindi ogni accensione è un viaggio diverso. Stili: `incisione`, `china`, `chiaroscuro`. |
 | `tarocchi` | **Tarocchi.** Mazzo completo di 78 carte (22 arcani maggiori e 56 minori). Ogni 30 secondi estrae una carta a caso, dritta o capovolta, e mostra il disegno originale con nome e parole chiave in italiano. |
+| `foto` | **Foto.** Mostra l'ultima foto caricata dalla pagina di controllo, trasformata in bianco e nero. Si salva solo la versione finale da pochi KB (`etere-foto.png` accanto a `etere.conf`), che sostituisce sempre la precedente; l'originale non viene mai scritto su disco. |
 | `etere` | **Etere.** Il ritratto delle reti Wi-Fi intorno al gadget: si vedono soprattutto i cambiamenti, per esempio qualcuno che passa. Non funziona mentre il gadget crea la sua rete, perché la radio è occupata. |
 
 Le estrazioni casuali usano il generatore casuale del sistema. Nessuna app
@@ -39,7 +40,12 @@ come il "login" delle reti degli alberghi. Se non si apre, vai su
 
 - mostrare subito un'app;
 - scegliere l'app da usare all'accensione;
+- caricare una foto dal telefono: diventa in bianco e nero e va subito sullo schermo;
 - cambiare intervalli, stile del frattale e carte capovolte.
+
+Se nella finestrina che si apre da sola il pulsante per scegliere la foto non
+funziona, chiudila scegliendo di restare collegato senza internet e apri
+http://10.42.0.1 nel browser.
 
 Su quella rete non c'è internet: il telefono potrebbe avvisarti, è normale.
 Funziona anche l'SSH: `ssh <utente>@10.42.0.1`.
@@ -119,8 +125,8 @@ di SD. Quasi tutto si cambia anche dalla pagina di controllo.
 
 | Chiave | Default | Significato |
 |---|---|---|
-| `APP` | `mandelbrot` | app all'accensione: `mandelbrot`, `tarocchi`, `etere` |
-| `MANDEL_SECONDS` | `30` | secondi tra un passo e l'altro del viaggio |
+| `APP` | `mandelbrot` | app all'accensione: `mandelbrot`, `tarocchi`, `foto`, `etere` |
+| `MANDEL_SECONDS` | `60` | secondi tra un passo e l'altro (se il calcolo dura di più, il passo arriva appena pronto) |
 | `MANDEL_STYLE` | `incisione` | `incisione`, `china`, `chiaroscuro` |
 | `MANDEL_ZOOM_LABEL` | `1` | mostra l'ingrandimento nell'angolo |
 | `TAROT_SECONDS` | `30` | secondi tra una carta e l'altra |

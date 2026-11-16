@@ -9,10 +9,10 @@ import os
 BOOT_DIRS = ("/boot/firmware", "/boot")
 
 DEFAULTS = {
-    # App mostrata all'accensione: mandelbrot | tarocchi | etere
+    # App mostrata all'accensione: mandelbrot | tarocchi | foto | etere
     "APP": "mandelbrot",
     # --- Mandelbrot ---
-    "MANDEL_SECONDS": "30",
+    "MANDEL_SECONDS": "60",
     # stile: incisione | china | chiaroscuro
     "MANDEL_STYLE": "incisione",
     # 1 = mostra l'ingrandimento nell'angolo
@@ -100,6 +100,13 @@ class Config:
         if self.path and self.path != os.devnull:
             save_values(self.path, changes)
 
+    def data_path(self, name):
+        """Dove salvare un piccolo file che deve sopravvivere ai riavvii: accanto
+        a etere.conf (partizione di boot), altrimenti nella cartella data."""
+        if self.path and self.path != os.devnull:
+            return os.path.join(os.path.dirname(os.path.abspath(self.path)), name)
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", name)
+
     def channel(self):
         v = self.values["CHANNEL"].strip().lower()
         return None if v == "auto" else int(v)
@@ -115,10 +122,7 @@ def _boot_mount(path):
 
 
 def save_values(path, changes):
-    """Aggiorna o aggiunge righe CHIAVE=valore mantenendo commenti e ordine.
-    Se la partizione di boot e' in sola lettura la riapre in scrittura solo
-    per il tempo della scrittura."""
-    import subprocess
+    """Aggiorna o aggiunge righe CHIAVE=valore mantenendo commenti e ordine."""
     lines = []
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
@@ -129,15 +133,21 @@ def save_values(path, changes):
         if "=" in raw.split("#", 1)[0] and key in todo:
             lines[i] = f"{key}={todo.pop(key)}"
     lines += [f"{k}={v}" for k, v in todo.items()]
-    text = "\n".join(lines) + "\n"
+    write_file(path, ("\n".join(lines) + "\n").encode("utf-8"))
+
+
+def write_file(path, data):
+    """Scrive un file in modo atomico. Se sta sulla partizione di boot in sola
+    lettura, la riapre in scrittura solo per il tempo della scrittura."""
+    import subprocess
     mnt = _boot_mount(path)
     remounted = False
     if mnt and not os.access(mnt, os.W_OK):
         remounted = subprocess.run(["mount", "-o", "remount,rw", mnt]).returncode == 0
     try:
         tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write(text)
+        with open(tmp, "wb") as f:
+            f.write(data)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, path)

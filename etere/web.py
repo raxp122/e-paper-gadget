@@ -9,10 +9,13 @@ molto limitati.
 import html
 import logging
 import threading
+from email.parser import BytesParser
+from email.policy import HTTP
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import apps
+from apps import foto
 from apps.mandelbrot import STYLES
 
 log = logging.getLogger("etere.web")
@@ -20,6 +23,7 @@ log = logging.getLogger("etere.web")
 DESCR = {
     "mandelbrot": "Scende sempre più in profondità nel frattale. Ogni accensione è un viaggio nuovo.",
     "tarocchi": "Una carta a caso dal mazzo completo di 78, dritta o capovolta.",
+    "foto": "L'ultima foto caricata qui sotto, in bianco e nero.",
     "etere": "Il ritratto delle reti Wi-Fi intorno. Non funziona mentre il gadget crea la sua rete.",
 }
 
@@ -41,6 +45,7 @@ button{font:inherit;font-size:15px;padding:10px 14px;border-radius:10px;border:1
 background:transparent;color:var(--fg);min-height:44px}button.pri{background:var(--acc);color:var(--accfg)}
 fieldset{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:12px 14px;margin:10px 0}
 legend{padding:0 6px;font-weight:600}label{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0}
+input[type=file]{font:inherit;font-size:14px;max-width:100%;padding:8px 0}
 input[type=number],select{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);
 background:var(--bg);color:var(--fg);width:110px}input[type=checkbox]{width:22px;height:22px}
 footer{color:var(--mute);font-size:13px;margin-top:28px}
@@ -70,12 +75,24 @@ def page(ctl, msg=""):
             out.append(f"<form method='post' action='/predefinita'><input type='hidden' name='app' value='{e(name)}'>"
                        "<button>Usa all'avvio</button></form>")
         out.append("</div></div>")
+    fits = "".join(f"<option value='{k}'>{e(v)}</option>" for k, v in foto.FITS.items())
+    out.append(
+        "<h2>Carica una foto</h2>"
+        "<form method='post' action='/foto' enctype='multipart/form-data'><fieldset>"
+        "<legend>Foto</legend>"
+        "<input type='file' name='foto' accept='image/*' required>"
+        f"<label>Inquadratura<select name='fit'>{fits}</select></label>"
+        "<label>Puntinato<select name='dither'><option value='floyd'>morbido</option>"
+        "<option value='bayer'>a reticolo</option></select></label>"
+        "<p style='color:var(--mute);font-size:13px;margin:6px 0 0'>Diventa in bianco e nero e "
+        "sostituisce la foto precedente. L'originale non viene salvato.</p>"
+        "</fieldset><button class='pri'>Carica e mostra</button></form>")
     chk = lambda k: " checked" if cfg.bool(k) else ""  # noqa: E731
     opts = "".join(f"<option{' selected' if s == cfg.str('MANDEL_STYLE') else ''}>{s}</option>" for s in STYLES)
     out.append(
         "<h2>Impostazioni</h2><form method='post' action='/impostazioni'>"
         "<fieldset><legend>Viaggio nel frattale</legend>"
-        f"<label>Nuovo passo ogni (secondi)<input type='number' name='MANDEL_SECONDS' min='15' max='3600' value='{e(cfg.str('MANDEL_SECONDS'))}'></label>"
+        f"<label>Nuovo passo ogni (secondi, o appena pronto se ci mette di più)<input type='number' name='MANDEL_SECONDS' min='15' max='3600' value='{e(cfg.str('MANDEL_SECONDS'))}'></label>"
         f"<label>Stile<select name='MANDEL_STYLE'>{opts}</select></label>"
         f"<label>Mostra l'ingrandimento<input type='checkbox' name='MANDEL_ZOOM_LABEL' value='1'{chk('MANDEL_ZOOM_LABEL')}></label>"
         "</fieldset><fieldset><legend>Tarocchi</legend>"
@@ -132,14 +149,17 @@ class Handler(BaseHTTPRequestHandler):
         # qualunque altro indirizzo (anche i controlli "c'e' internet?" dei
         # telefoni) riceve la pagina: e' cosi' che il telefono la apre da solo
         msg = {"mostra": "Fatto, tra pochi secondi sullo schermo.",
+               "foto": "Foto caricata: tra pochi secondi sullo schermo.",
                "avvio": "Salvato: la userà a ogni accensione.",
                "salvato": "Impostazioni salvate."}.get(parse_qs(url.query).get("ok", [""])[0], "")
         self._send(page(self.ctl, msg))
 
     def do_POST(self):
         n = int(self.headers.get("Content-Length") or 0)
-        form = parse_qs(self.rfile.read(min(n, 10000)).decode("utf-8", "replace"))
         path = urlparse(self.path).path
+        if path == "/foto":
+            return self._photo(n)
+        form = parse_qs(self.rfile.read(min(n, 10000)).decode("utf-8", "replace"))
         app = form.get("app", [""])[0]
         if path == "/mostra" and app in apps.APPS:
             self.ctl.show(app)
@@ -152,6 +172,43 @@ class Handler(BaseHTTPRequestHandler):
             self.ctl.reload()
             return self._redirect("salvato")
         self._send(page(self.ctl, "Richiesta non valida."), 400)
+
+
+    def _photo(self, n):
+        if n <= 0 or n > foto.MAX_UPLOAD:
+            self.close_connection = True
+            return self._send(page(self.ctl, "Foto troppo grande (massimo 30 MB)."), 413)
+        fields = parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(n))
+        data = fields.get("foto")
+        if not data:
+            return self._send(page(self.ctl, "Nessuna foto ricevuta."), 400)
+        fit = fields.get("fit", b"riempi").decode(errors="replace")
+        method = fields.get("dither", b"floyd").decode(errors="replace")
+        try:
+            img = foto.process(data, fit if fit in foto.FITS else "riempi",
+                               method if method in ("floyd", "bayer") else "floyd")
+        except foto.PhotoError as e:
+            return self._send(page(self.ctl, f"Foto non valida: {e}."), 400)
+        finally:
+            del data, fields  # l'originale non resta in memoria
+        foto.save(self.ctl.cfg, img)
+        self.ctl.show("foto")
+        return self._redirect("foto")
+
+
+def parse_multipart(content_type, body):
+    """Form multipart/form-data -> {nome campo: byte}. (Il modulo cgi non
+    esiste piu' in Python 3.13, quindi usiamo il parser email.)"""
+    if not content_type.startswith("multipart/form-data"):
+        return {}
+    msg = BytesParser(policy=HTTP).parsebytes(
+        b"Content-Type: " + content_type.encode("latin-1") + b"\r\nMIME-Version: 1.0\r\n\r\n" + body)
+    out = {}
+    for part in msg.iter_parts():
+        name = part.get_param("name", header="content-disposition")
+        if name:
+            out[name] = part.get_payload(decode=True) or b""
+    return out
 
 
 class Controller:

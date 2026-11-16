@@ -139,7 +139,7 @@ un lettore di SD.
 | `EXPOSURE_SECONDS` | `10` | secondi di ascolto tra uno scatto e l'altro |
 | `FIRST_EXPOSURE_SECONDS` | `5` | esposizione del primo scatto |
 | `CLEAN` | `0.6` | 0 = immagine grezza, 1 = molto pulita |
-| `EPD` | `V2` | versione del pannello: V2, V3, V4 |
+| `EPD` | `V3` | versione del pannello: V2, V3, V4 |
 | `INVERT` | `0` | 1 = inverte bianco e nero |
 | `ROTATE` | `0` | 180 se il display è montato capovolto |
 | `KEEP_WIFI` | `1` | 1 = il Wi-Fi normale resta acceso e SSH funziona. 0 = il gadget si prende la radio: canale fisso, cattura più pura, niente SSH |

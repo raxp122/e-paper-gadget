@@ -20,7 +20,7 @@ DEFAULTS = {
     # Quanto ripulire l'immagine: 0 = grezza, 1 = molto pulita
     "CLEAN": "0.6",
     # Versione del pannello: V2 | V3 | V4 (vedi etichetta sul retro)
-    "EPD": "V2",
+    "EPD": "V3",
     # 1 = inverte bianco e nero
     "INVERT": "0",
     # 0 oppure 180 (se il display e' montato capovolto)

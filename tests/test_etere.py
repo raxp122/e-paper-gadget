@@ -1,6 +1,7 @@
 """Test eseguibili ovunque (anche sul PC):  python3 -m unittest discover tests"""
 import os
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -324,6 +325,36 @@ class DisplayTest(unittest.TestCase):
         c = [x for x in d.epd.calls if x != "init"]
         self.assertEqual(c, ["base", "partial", "partial", "partial", "base", "base", "full", "sleep"])
         self.assertFalse(d.awake)
+
+
+class ReteTest(unittest.TestCase):
+    def _fake(self, states):
+        calls = []
+        seq = iter(states)
+
+        def run(cmd, timeout=60):
+            calls.append(cmd)
+            if cmd[:2] == ["nmcli", "-t"]:
+                st = next(seq, states[-1])
+                return subprocess.CompletedProcess(cmd, 0, f"eth0:unavailable\nwlan0:{st}\n", "")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        t = [0.0]
+
+        def sleep(s):
+            t[0] += s
+        return run, sleep, (lambda: t[0]), calls
+
+    def test_hotspot_trovato(self):
+        import rete
+        run, sleep, clock, calls = self._fake(["connecting", "connected"])
+        self.assertEqual(rete.fallback("wlan0", 45, run, sleep, clock), "client")
+        self.assertNotIn(["nmcli", "connection", "up", rete.AP], calls)
+
+    def test_nessuna_rete_accende_la_propria(self):
+        import rete
+        run, sleep, clock, calls = self._fake(["disconnected"])
+        self.assertEqual(rete.fallback("wlan0", 45, run, sleep, clock), "ap")
+        self.assertEqual(calls[-1], ["nmcli", "connection", "up", rete.AP])
 
 
 class WebTest(unittest.TestCase):

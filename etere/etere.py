@@ -16,6 +16,7 @@ import apps
 import config
 import display
 import render
+import rete
 import sources
 import web
 
@@ -122,6 +123,8 @@ def main(argv=None):
     port = a.web_port if a.web_port is not None else (0 if a.out else int(cfg.str("WEB_PORT")))
     if port:
         web.start(ctl, port)
+    if not a.out:
+        rete.start_fallback(cfg)   # senza rete conosciuta, accende "raspberry"
     return run(cfg, display.make(cfg, a.out), ctl, a.once)
 
 

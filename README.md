@@ -49,8 +49,8 @@ All'accensione il gadget cerca le reti che conosce (per esempio l'hotspot del
 telefono configurato con Raspberry Pi Imager):
 
 - **se la trova**, si collega: puoi entrare via SSH e aggiornare da GitHub;
-- **se non la trova**, crea la sua rete **`raspberry`** (password predefinita
-  `raspberrypi`).
+- **se non la trova entro 45 secondi**, crea la sua rete **`raspberry`**
+  (password predefinita `raspberrypi`).
 
 Collegati a `raspberry` dal telefono: la pagina di controllo si apre da sola,
 come il "login" delle reti degli alberghi. Se non si apre, vai su
@@ -166,6 +166,7 @@ di SD. Quasi tutto si cambia anche dalla pagina di controllo.
 | `EPD_FULL_EVERY` | `30` | con il refresh parziale, uno completo ogni tanti aggiornamenti |
 | `AP_SSID` / `AP_PASSWORD` | `raspberry` / `raspberrypi` | rete del gadget (dopo una modifica rilancia `install.sh`) |
 | `WEB_PORT` | `80` | porta della pagina di controllo |
+| `AP_FALLBACK_SECONDS` | `45` | quanto aspettare una rete conosciuta prima di accendere la propria |
 | `EPD` | `V3` | versione del pannello: V2, V3, V4 |
 | `ROTATE` | `0` | 180 se il display è montato capovolto |
 
@@ -201,6 +202,7 @@ Nessuna sorgente legge o conserva indirizzi MAC, nomi di rete o contenuti.
 | Il Pi non si collega all'hotspot dell'iPhone | Attiva *Massimizza compatibilità*: il Pi Zero W vede solo i 2,4 GHz. |
 | SSH risponde "Connection refused" | Al primo avvio aspetta 3-5 minuti. Se non basta, crea un file vuoto `ssh` nella partizione `bootfs`. |
 | `apt` si interrompe a metà download | Succede con gli hotspot: rilancia `install.sh`, riparte da dove si era fermato. |
+| La rete `raspberry` non compare | All'avvio il gadget aspetta 45 secondi una rete conosciuta (`AP_FALLBACK_SECONDS`), poi accende la sua: aspetta circa un minuto e mezzo dall'accensione. Per accenderla subito: `sudo nmcli connection up etere-ap`. Dopo aver cambiato `AP_SSID` o `AP_PASSWORD` rilancia `install.sh`. |
 | La pagina non si apre da sola | Apri `http://10.42.0.1` nel browser. Su iPhone, se nella finestrina non riesci a scegliere una foto, chiudila scegliendo di restare collegato senza internet e usa Safari. |
 | Etere dice "la radio non è disponibile" | Con la rete `raspberry` attiva la radio è occupata: collega il gadget all'hotspot. |
 | Dopo un aggiornamento non cambia nulla | Serve `sudo systemctl restart etere`, oppure stacca e riattacca. |

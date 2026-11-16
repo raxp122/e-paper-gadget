@@ -1,0 +1,15 @@
+[Unit]
+Description=Etere - Polaroid radio su e-paper
+After=local-fs.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/etere
+ExecStart=/usr/bin/python3 /opt/etere/etere.py
+Restart=on-failure
+RestartSec=5
+# 3 = nessuna radio disponibile: inutile riprovare all'infinito
+RestartPreventExitStatus=3
+
+[Install]
+WantedBy=multi-user.target

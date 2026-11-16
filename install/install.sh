@@ -8,11 +8,14 @@ DEST=/opt/etere
 BOOT=/boot/firmware; [ -d "$BOOT" ] || BOOT=/boot
 
 echo "==> Pacchetti"
-apt-get update
-apt-get install -y python3-numpy python3-pil python3-spidev python3-gpiozero \
+# IPv4 forzato e piu' tentativi: sugli hotspot del telefono IPv6 spesso non va
+# e la connessione puo' cadere a meta' download
+APT="apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5"
+$APT update
+$APT install -y python3-numpy python3-pil python3-spidev python3-gpiozero \
     iw rfkill git fonts-dejavu-core
 # gpiozero ha bisogno di un "pin factory": lgpio (Bookworm e successivi) o RPi.GPIO
-apt-get install -y python3-lgpio || apt-get install -y python3-rpi.gpio || true
+$APT install -y python3-lgpio || $APT install -y python3-rpi.gpio || true
 
 echo "==> SPI (serve al display)"
 raspi-config nonint do_spi 0

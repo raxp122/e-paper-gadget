@@ -5,9 +5,12 @@ cose diverse a seconda dell'app scelta. All'accensione parte l'app
 predefinita. Dal telefono, collegato alla rete del gadget, si apre una
 paginetta per cambiare app e impostazioni.
 
-A ogni frame lo schermo fa un refresh completo e poi il pannello va a dormire.
-Puoi staccare la corrente in qualsiasi momento **tranne mentre lo schermo
-lampeggia**: l'ultima immagine resta sull'e-paper finché non lo riaccendi.
+Le app lente (frattale, tarocchi, foto, etere) fanno un refresh completo e
+poi mettono il pannello a dormire. Quelle veloci (vita, labirinto) usano il
+**refresh parziale**: circa 0,3 secondi, senza lampeggio, con un refresh
+completo ogni 30 aggiornamenti per cancellare gli aloni. Puoi staccare la
+corrente in qualsiasi momento **tranne durante un aggiornamento**: l'ultima
+immagine resta sull'e-paper finché non lo riaccendi.
 
 ## Le app
 
@@ -15,6 +18,8 @@ lampeggia**: l'ultima immagine resta sull'e-paper finché non lo riaccendi.
 |---|---|
 | `mandelbrot` (predefinita) | **Viaggio nel frattale.** Ogni minuto (o appena pronto, se il calcolo dura di più) scende più in profondità nell'insieme di Mandelbrot, fino a ingrandimenti di centinaia di miliardi. Un "pilota automatico" sceglie a ogni passo un punto sul bordo del frattale, quindi ogni accensione è un viaggio diverso. Stili: `incisione`, `china`, `chiaroscuro`. |
 | `tarocchi` | **Tarocchi.** Mazzo completo di 78 carte (22 arcani maggiori e 56 minori). Ogni 30 secondi estrae una carta a caso, dritta o capovolta, e mostra il disegno originale con nome e parole chiave in italiano. |
+| `vita` | **Gioco della vita.** Ogni 5 secondi una generazione del gioco di Conway, su un mondo che si richiude su se stesso. Quando si stabilizza (tutto fermo o figure che si ripetono) mostra ancora qualche passo e riparte da una disposizione casuale. Dopo 1000 generazioni riparte comunque. |
+| `labirinto` | **Labirinto.** Genera un labirinto e un topolino lo esplora a passi di 12 celle ogni 5 secondi, tornando indietro dai vicoli ciechi: la linea è il cammino attuale, i puntini i tratti abbandonati. Trovata l'uscita, ne genera un altro. |
 | `foto` | **Foto.** Mostra l'ultima foto caricata dalla pagina di controllo, trasformata in bianco e nero. Si salva solo la versione finale da pochi KB (`etere-foto.png` accanto a `etere.conf`), che sostituisce sempre la precedente; l'originale non viene mai scritto su disco. |
 | `etere` | **Etere.** Il ritratto delle reti Wi-Fi intorno al gadget: si vedono soprattutto i cambiamenti, per esempio qualcuno che passa. Non funziona mentre il gadget crea la sua rete, perché la radio è occupata. |
 
@@ -125,12 +130,16 @@ di SD. Quasi tutto si cambia anche dalla pagina di controllo.
 
 | Chiave | Default | Significato |
 |---|---|---|
-| `APP` | `mandelbrot` | app all'accensione: `mandelbrot`, `tarocchi`, `foto`, `etere` |
+| `APP` | `mandelbrot` | app all'accensione: `mandelbrot`, `tarocchi`, `vita`, `labirinto`, `foto`, `etere` |
 | `MANDEL_SECONDS` | `60` | secondi tra un passo e l'altro (se il calcolo dura di più, il passo arriva appena pronto) |
 | `MANDEL_STYLE` | `incisione` | `incisione`, `china`, `chiaroscuro` |
 | `MANDEL_ZOOM_LABEL` | `1` | mostra l'ingrandimento nell'angolo |
 | `TAROT_SECONDS` | `30` | secondi tra una carta e l'altra |
 | `TAROT_REVERSED` | `1` | le carte possono uscire capovolte |
+| `LIFE_SECONDS` | `5` | secondi tra una generazione e l'altra |
+| `LIFE_DENSITY` | `0.3` | quota di celle vive alla partenza |
+| `MAZE_SECONDS` / `MAZE_STEPS` | `5` / `12` | ogni quanto e di quante celle avanza il topolino |
+| `EPD_FULL_EVERY` | `30` | con il refresh parziale, uno completo ogni tanti aggiornamenti |
 | `AP_SSID` / `AP_PASSWORD` | `raspberry` / `raspberrypi` | rete del gadget (dopo una modifica rilancia `install.sh`) |
 | `WEB_PORT` | `80` | porta della pagina di controllo |
 | `EPD` | `V3` | versione del pannello: V2, V3, V4 |

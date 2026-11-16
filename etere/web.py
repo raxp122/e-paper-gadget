@@ -23,6 +23,8 @@ log = logging.getLogger("etere.web")
 DESCR = {
     "mandelbrot": "Scende sempre più in profondità nel frattale. Ogni accensione è un viaggio nuovo.",
     "tarocchi": "Una carta a caso dal mazzo completo di 78, dritta o capovolta.",
+    "vita": "Il gioco della vita di Conway: una generazione ogni pochi secondi, finché il mondo si stabilizza. Poi riparte.",
+    "labirinto": "Genera un labirinto e un topolino lo esplora fino all'uscita. Poi ne genera un altro.",
     "foto": "L'ultima foto caricata qui sotto, in bianco e nero.",
     "etere": "Il ritratto delle reti Wi-Fi intorno. Non funziona mentre il gadget crea la sua rete.",
 }
@@ -98,6 +100,10 @@ def page(ctl, msg=""):
         "</fieldset><fieldset><legend>Tarocchi</legend>"
         f"<label>Nuova carta ogni (secondi)<input type='number' name='TAROT_SECONDS' min='15' max='3600' value='{e(cfg.str('TAROT_SECONDS'))}'></label>"
         f"<label>Carte capovolte<input type='checkbox' name='TAROT_REVERSED' value='1'{chk('TAROT_REVERSED')}></label>"
+        "</fieldset><fieldset><legend>Gioco della vita</legend>"
+        f"<label>Nuova generazione ogni (secondi)<input type='number' name='LIFE_SECONDS' min='3' max='3600' value='{e(cfg.str('LIFE_SECONDS'))}'></label>"
+        "</fieldset><fieldset><legend>Labirinto</legend>"
+        f"<label>Passo del topolino ogni (secondi)<input type='number' name='MAZE_SECONDS' min='3' max='3600' value='{e(cfg.str('MAZE_SECONDS'))}'></label>"
         "</fieldset><button class='pri'>Salva</button></form>"
         f"<footer>Rete {e(cfg.str('AP_SSID'))} · http://10.42.0.1</footer></main></body></html>")
     return "".join(out)
@@ -105,12 +111,13 @@ def page(ctl, msg=""):
 
 def apply_settings(cfg, form):
     changes = {}
-    for key in ("MANDEL_SECONDS", "TAROT_SECONDS"):
+    for key, low in (("MANDEL_SECONDS", 15), ("TAROT_SECONDS", 15),
+                     ("LIFE_SECONDS", 3), ("MAZE_SECONDS", 3)):
         try:
             v = int(float(form.get(key, [""])[0]))
         except ValueError:
             continue
-        changes[key] = str(max(15, min(3600, v)))
+        changes[key] = str(max(low, min(3600, v)))
     style = form.get("MANDEL_STYLE", [""])[0]
     if style in STYLES:
         changes["MANDEL_STYLE"] = style

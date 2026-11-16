@@ -235,6 +235,97 @@ class FotoTest(unittest.TestCase):
         self.assertEqual(f["foto"], b"\x00\x01\r\n\xffDATA")
 
 
+class VitaTest(unittest.TestCase):
+    def test_regole(self):
+        from apps.vita import step
+        g = np.zeros((6, 6), np.uint8)
+        g[2, 1:4] = 1                                   # lampeggiatore: periodo 2
+        self.assertFalse((step(g) == g).all())
+        self.assertTrue((step(step(g)) == g).all())
+        b = np.zeros((6, 6), np.uint8)
+        b[2:4, 2:4] = 1                                 # blocco: fermo
+        self.assertTrue((step(b) == b).all())
+
+    def test_si_stabilizza_e_riparte(self):
+        from apps.vita import VitaApp, HOLD
+        app = VitaApp(config.Config({"LIFE_MAX_GEN": "6"}, path=os.devnull))
+        for _ in range(6 + HOLD + 1):
+            img, wait = app.frame()
+        self.assertEqual((img.size, wait), ((250, 122), 5.0))
+        self.assertLess(app.gen, 6)                     # e' ripartito da capo
+
+
+class LabirintoTest(unittest.TestCase):
+    def test_labirinto_perfetto(self):
+        import random
+        from apps.labirinto import generate
+        rows, cols = 12, 20
+        op = generate(rows, cols, random.Random(1))
+        self.assertEqual(len(op) // 2, rows * cols - 1)  # albero: un solo percorso
+        seen, todo = {(0, 0)}, [(0, 0)]
+        while todo:
+            a = todo.pop()
+            for x, b in op:
+                if x == a and b not in seen:
+                    seen.add(b)
+                    todo.append(b)
+        self.assertEqual(len(seen), rows * cols)         # tutto raggiungibile
+
+    def test_trova_uscita_e_ricomincia(self):
+        from apps.labirinto import LabirintoApp, HOLD
+        app = LabirintoApp(config.Config({"MAZE_STEPS": "50"}, path=os.devnull))
+        for _ in range(500):
+            img, _ = app.frame()
+            if app.done:
+                break
+        self.assertTrue(app.done)
+        self.assertEqual(app.stack[-1], app.exit)
+        self.assertEqual(img.size, (250, 122))
+        for _ in range(HOLD + 1):
+            app.frame()
+        self.assertFalse(app.done)                       # labirinto nuovo
+
+
+class DisplayTest(unittest.TestCase):
+    def test_parziali_e_completi(self):
+        import display
+
+        class FakeEpd:
+            FULL_UPDATE = 0
+
+            def __init__(self):
+                self.calls = []
+
+            def init(self):
+                self.calls.append("init")
+
+            def getbuffer(self, img):
+                return b""
+
+            def display(self, b):
+                self.calls.append("full")
+
+            def displayPartBaseImage(self, b):
+                self.calls.append("base")
+
+            def displayPartial(self, b):
+                self.calls.append("partial")
+
+            def sleep(self):
+                self.calls.append("sleep")
+
+        d = display.EpdDisplay.__new__(display.EpdDisplay)
+        d.epd, d.model, d.full_every, d.awake, d.partials, d.can_partial = FakeEpd(), "V3", 3, False, 0, True
+        img = render.message("x")
+        for _ in range(5):
+            d.show(img, partial=True)
+        d.show(img, partial=True, reset=True)
+        d.show(img)                                      # app lenta: completo + sleep
+        c = [x for x in d.epd.calls if x != "init"]
+        self.assertEqual(c, ["base", "partial", "partial", "partial", "base", "base", "full", "sleep"])
+        self.assertFalse(d.awake)
+
+
 class WebTest(unittest.TestCase):
     def test_pagina_e_impostazioni(self):
         import web
@@ -242,6 +333,7 @@ class WebTest(unittest.TestCase):
         page = web.page(web.Controller(cfg, "tarocchi"), "ok")
         self.assertIn("Tarocchi", page)
         self.assertIn("/mostra", page)
+        self.assertEqual(web.apply_settings(cfg, {"LIFE_SECONDS": ["1"]})["LIFE_SECONDS"], "3")
         ch = web.apply_settings(cfg, {"MANDEL_SECONDS": ["5"], "TAROT_SECONDS": ["99999"],
                                       "MANDEL_STYLE": ["china"], "TAROT_REVERSED": ["1"]})
         self.assertEqual(ch["MANDEL_SECONDS"], "15")

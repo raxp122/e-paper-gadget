@@ -9,7 +9,7 @@ import os
 BOOT_DIRS = ("/boot/firmware", "/boot")
 
 DEFAULTS = {
-    # App mostrata all'accensione: mandelbrot | tarocchi | foto | etere
+    # App mostrata all'accensione: mandelbrot | tarocchi | vita | labirinto | foto | etere
     "APP": "mandelbrot",
     # --- Mandelbrot ---
     "MANDEL_SECONDS": "60",
@@ -21,6 +21,23 @@ DEFAULTS = {
     "TAROT_SECONDS": "30",
     # 1 = le carte possono uscire capovolte (meta' delle volte)
     "TAROT_REVERSED": "1",
+    # --- Gioco della vita ---
+    "LIFE_SECONDS": "5",
+    "LIFE_DENSITY": "0.3",
+    # lato di una cella in pixel
+    "LIFE_CELL": "3",
+    # dopo tante generazioni riparte comunque (gli alianti possono girare per sempre)
+    "LIFE_MAX_GEN": "1000",
+    "LIFE_LABEL": "1",
+    # --- Labirinto ---
+    "MAZE_SECONDS": "5",
+    # passi del topolino per ogni aggiornamento
+    "MAZE_STEPS": "12",
+    # lato di una cella in pixel
+    "MAZE_CELL": "6",
+    # --- Display ---
+    # con gli aggiornamenti parziali, un refresh completo ogni tanti frame
+    "EPD_FULL_EVERY": "30",
     # --- Rete del gadget e pagina di controllo ---
     "AP_SSID": "raspberry",
     # almeno 8 caratteri (regola del Wi-Fi WPA2)

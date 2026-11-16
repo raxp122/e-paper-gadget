@@ -3,8 +3,9 @@
 
 All'accensione parte l'app scelta come predefinita. Dal telefono, collegato
 alla rete del gadget, si apre una paginetta per cambiare app e impostazioni.
-A ogni frame lo schermo fa un refresh completo e poi resta fermo: si puo'
-staccare la corrente quando si vuole, tranne mentre lampeggia.
+Le app lente fanno un refresh completo e mettono il pannello a dormire, quelle
+veloci (vita, labirinto) usano il refresh parziale. Si puo' staccare la
+corrente quando si vuole, tranne durante un aggiornamento.
 """
 import argparse
 import logging
@@ -80,7 +81,11 @@ def run(cfg, out, ctl, once=False):
                 img, interval = app.frame()
                 if ctl.changed.is_set():
                     break                       # nel frattempo e' stata scelta un'altra app
-                out.show(img.rotate(rot) if rot else img)   # refresh completo + sleep
+                # app veloci: refresh parziale; le altre: completo + sleep del pannello
+                out.show(img.rotate(rot) if rot else img,
+                         partial=getattr(app, "partial", False),
+                         reset=getattr(app, "reset_next", False))
+                app.reset_next = False
                 if once:
                     return 0
                 wait = interval - (time.monotonic() - t0)

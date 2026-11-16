@@ -44,7 +44,10 @@ DEFAULTS = {
     "AP_PASSWORD": "raspberrypi",
     "WEB_PORT": "80",
     # secondi di attesa di una rete conosciuta prima di accendere la propria
-    "AP_FALLBACK_SECONDS": "45",
+    "AP_FALLBACK_SECONDS": "90",
+    # con la rete del gadget accesa e nessuno collegato, ogni quanto riprovare
+    # le reti conosciute (per esempio l'hotspot del telefono)
+    "AP_RETRY_SECONDS": "300",
     # --- Etere (onde Wi-Fi) ---
     # Da dove arriva il segnale: auto | csi | rssi | scan | sim
     "SOURCE": "auto",

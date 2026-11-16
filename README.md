@@ -1,62 +1,66 @@
-# Etere: una Polaroid dell'etere radio
+# Etere: un gadget e-paper con più anime
 
-Un Raspberry Pi Zero W con display e-paper Waveshare 2.13" che "fotografa" le
-onde radio intorno a sé. Gli dai corrente e lui ascolta, disegna e aggiorna lo
-schermo ogni ~15 secondi. Quando uno scatto ti piace, stacchi la corrente e
-l'immagine resta sull'e-paper finché non lo riaccendi.
+Un Raspberry Pi Zero W con display e-paper Waveshare 2.13" (V3) che mostra
+cose diverse a seconda dell'app scelta. All'accensione parte l'app
+predefinita. Dal telefono, collegato alla rete del gadget, si apre una
+paginetta per cambiare app e impostazioni.
 
-Non salva nulla. Ogni scatto esiste solo sul display.
+A ogni frame lo schermo fa un refresh completo e poi il pannello va a dormire.
+Puoi staccare la corrente in qualsiasi momento **tranne mentre lo schermo
+lampeggia**: l'ultima immagine resta sull'e-paper finché non lo riaccendi.
 
-```
-corrente -> ascolto (esposizione ~10 s, schermo fermo) -> immagine
-         -> refresh completo (~2 s, lo schermo lampeggia) -> pannello in sleep
-         -> di nuovo ascolto ...
-```
+## Le app
 
-Puoi staccare in qualsiasi momento **tranne mentre lo schermo lampeggia**.
+| App | Cosa fa |
+|---|---|
+| `mandelbrot` (predefinita) | **Viaggio nel frattale.** Ogni 30 secondi scende più in profondità nell'insieme di Mandelbrot, fino a ingrandimenti di centinaia di miliardi. Un "pilota automatico" sceglie a ogni passo un punto sul bordo del frattale, quindi ogni accensione è un viaggio diverso. Stili: `incisione`, `china`, `chiaroscuro`. |
+| `tarocchi` | **Tarocchi.** Mazzo completo di 78 carte (22 arcani maggiori e 56 minori). Ogni 30 secondi estrae una carta a caso, dritta o capovolta, e mostra il disegno originale con nome e parole chiave in italiano. |
+| `etere` | **Etere.** Il ritratto delle reti Wi-Fi intorno al gadget: si vedono soprattutto i cambiamenti, per esempio qualcuno che passa. Non funziona mentre il gadget crea la sua rete, perché la radio è occupata. |
 
-## Da dove arriva l'immagine (sorgenti)
+Le estrazioni casuali usano il generatore casuale del sistema. Nessuna app
+salva nulla: tutto vive solo sullo schermo.
 
-| Sorgente | Cosa misura | Sul Pi Zero W |
-|---|---|---|
-| `csi` | Channel State Information: come ogni sottoportante Wi-Fi viene deformata dall'ambiente | **Non supportata ufficialmente.** Nexmon CSI non ha la patch per il chip bcm43430a1. Il codice è pronto nel caso un giorno lo sia. |
-| `rssi` | Modalità monitor su **un solo canale**: la potenza di ogni frame nel tempo. Righe = livello di segnale (dBm), colonne = tempo | Funziona se il chip accetta la modalità monitor (firmware di serie oppure Nexmon) |
-| `scan` | Ripiego: scansioni Wi-Fi normali. Righe = frequenza 2400–2490 MHz, colonne = scansioni | Funziona sempre, ma l'immagine è più statica |
+Per aggiungere un'app: un modulo in `etere/apps/` con `name`, `title`,
+`frame()` (che ritorna un'immagine 1-bit 250×122 e i secondi di attesa) e
+`close()`, registrato in `etere/apps/__init__.py`.
 
-Con `SOURCE=auto` il programma prova `csi`, poi `rssi` e infine `scan`, e usa la
-prima che funziona.
+## La rete del gadget e la pagina di controllo
 
-**Privacy:** nessuna sorgente legge o conserva indirizzi MAC, nomi di rete o
-contenuti. Si usa solo la potenza dei segnali.
+All'accensione il gadget cerca le reti che conosce (per esempio l'hotspot del
+telefono configurato con Raspberry Pi Imager):
 
-Anteprima sul PC (dati simulati, stesso codice del Pi):
+- **se la trova**, si collega: puoi entrare via SSH e aggiornare da GitHub;
+- **se non la trova**, crea la sua rete **`raspberry`** (password predefinita
+  `raspberrypi`).
 
-```bash
-python3 tools/preview.py anteprima.png
-```
+Collegati a `raspberry` dal telefono: la pagina di controllo si apre da sola,
+come il "login" delle reti degli alberghi. Se non si apre, vai su
+**http://10.42.0.1**. Da lì puoi:
+
+- mostrare subito un'app;
+- scegliere l'app da usare all'accensione;
+- cambiare intervalli, stile del frattale e carte capovolte.
+
+Su quella rete non c'è internet: il telefono potrebbe avvisarti, è normale.
+Funziona anche l'SSH: `ssh <utente>@10.42.0.1`.
+
+> **Sicurezza:** il repo è pubblico, quindi la password predefinita della rete
+> la conosce chiunque lo legga. Cambia `AP_PASSWORD` in `etere.conf` (almeno 8
+> caratteri), rilancia `install.sh`, e cambia anche la password dell'utente
+> con `passwd`.
 
 ## Installazione
 
 ### 1. Scrivi la SD
 
 Con **Raspberry Pi Imager**: dispositivo *Raspberry Pi Zero*, sistema
-**Raspberry Pi OS Lite (32-bit)**. Nelle impostazioni (l'ingranaggio):
-
-- hostname: `etere`
-- abilita SSH
-- utente e password
-- Wi-Fi: nome e password della rete (o dell'hotspot), paese `IT`
+**Raspberry Pi OS Lite (32-bit)**. Nelle impostazioni: hostname, utente e
+password, SSH attivo, Wi-Fi (o l'hotspot del telefono) con paese `IT`.
 
 > Il Pi Zero W usa solo i **2,4 GHz**. Con l'hotspot di un iPhone attiva
 > *Impostazioni → Hotspot personale → Massimizza compatibilità*.
 
-### 2. Entra via SSH
-
-```bash
-ssh <utente>@etere.local
-```
-
-### 3. Installa
+### 2. Installa
 
 ```bash
 sudo apt-get install -y git
@@ -65,57 +69,38 @@ cd e-paper-gadget
 sudo ./install/install.sh
 ```
 
-Lo script installa le dipendenze, attiva lo SPI, scarica il driver Waveshare,
-copia il programma in `/opt/etere`, mette la configurazione in
-`/boot/firmware/etere.conf` e abilita l'avvio automatico.
+Lo script installa le dipendenze, attiva lo SPI, scarica il driver Waveshare e
+le 78 carte, copia il programma in `/opt/etere`, crea la configurazione
+`/boot/firmware/etere.conf`, prepara la rete `raspberry` e abilita l'avvio
+automatico.
 
-### 4. Prova
+### 3. Prova e avvia
 
 ```bash
 sudo python3 /opt/etere/etere.py --test-display
-```
-
-Deve comparire "etere – display OK". Se lo schermo resta bianco o è sporco,
-cambia `EPD=` in `/boot/firmware/etere.conf` (V2, V3 o V4, come sull'etichetta
-dietro il display) e riprova.
-
-```bash
-sudo python3 /opt/etere/etere.py --probe
-```
-
-Ti dice quali sorgenti funzionano sul tuo Pi.
-
-### 5. Avvia
-
-```bash
-sudo systemctl start etere
-```
-
-Da qui in poi parte da solo a ogni accensione. Per vedere i log:
-
-```bash
+sudo systemctl restart etere
 journalctl -u etere -f
 ```
 
-### 6. (Opzionale) Modalità monitor con Nexmon
+Se il display resta bianco, cambia `EPD=` in `/boot/firmware/etere.conf`
+(V2, V3 o V4, come sull'etichetta dietro il display).
 
-Solo se `--probe` dice che `rssi` **non** funziona. È sperimentale, la
-compilazione dura ore e funziona solo con kernel fino al 6.6:
+### Aggiornare
 
-```bash
-sudo ./install/install-nexmon.sh
-```
-
-### 7. Rendilo effimero (sola lettura)
-
-Quando tutto funziona, metti il sistema in sola lettura: le scritture finiscono
-in RAM e staccare la corrente non può rovinare la SD.
+Accendi l'hotspot del telefono, riavvia il gadget, entra via SSH e:
 
 ```bash
-sudo ./install/readonly.sh
+cd ~/e-paper-gadget && git pull && sudo ./install/install.sh && sudo systemctl restart etere
 ```
 
-Per tornare indietro (per esempio per aggiornare):
+### Renderlo effimero (sola lettura)
+
+Quando tutto funziona, `sudo ./install/readonly.sh` mette il sistema in sola
+lettura: staccare la corrente non può più rovinare la SD. Le scelte fatte
+dalla pagina di controllo vengono comunque salvate, perché `etere.conf` sta
+sulla partizione di boot, che viene riaperta in scrittura solo per un attimo.
+
+Per tornare indietro:
 
 ```bash
 sudo raspi-config nonint disable_overlayfs && sudo reboot
@@ -127,38 +112,65 @@ poi, dopo il riavvio:
 sudo raspi-config nonint disable_bootro && sudo reboot
 ```
 
-## Configurazione
+## Configurazione (`etere.conf`)
 
-Il file `etere.conf` sta nella partizione di boot: lo modifichi anche dal PC con
-un lettore di SD.
+Il file sta nella partizione di boot: si modifica anche dal PC con un lettore
+di SD. Quasi tutto si cambia anche dalla pagina di controllo.
 
 | Chiave | Default | Significato |
 |---|---|---|
-| `SOURCE` | `auto` | `auto`, `csi`, `rssi`, `scan` |
-| `CHANNEL` | `auto` | canale 1–13 oppure `auto` (il più trafficato) |
-| `EXPOSURE_SECONDS` | `10` | secondi di ascolto tra uno scatto e l'altro |
-| `FIRST_EXPOSURE_SECONDS` | `5` | esposizione del primo scatto |
-| `CLEAN` | `0.6` | 0 = immagine grezza, 1 = molto pulita |
-| `VIEW` | `intensita` | `spettro` = il segnale così com'è; `variazioni` = solo i cambiamenti nel tempo (più forte = bianco, più debole = nero); `intensita` = quanto cambia (fermo = nero, evento = bianco); `mix` = metà spettro e metà intensità |
-| `DITHER` | `bayer` | `floyd` = morbido; `bayer` = a reticolo, tipo incisione |
+| `APP` | `mandelbrot` | app all'accensione: `mandelbrot`, `tarocchi`, `etere` |
+| `MANDEL_SECONDS` | `30` | secondi tra un passo e l'altro del viaggio |
+| `MANDEL_STYLE` | `incisione` | `incisione`, `china`, `chiaroscuro` |
+| `MANDEL_ZOOM_LABEL` | `1` | mostra l'ingrandimento nell'angolo |
+| `TAROT_SECONDS` | `30` | secondi tra una carta e l'altra |
+| `TAROT_REVERSED` | `1` | le carte possono uscire capovolte |
+| `AP_SSID` / `AP_PASSWORD` | `raspberry` / `raspberrypi` | rete del gadget (dopo una modifica rilancia `install.sh`) |
+| `WEB_PORT` | `80` | porta della pagina di controllo |
 | `EPD` | `V3` | versione del pannello: V2, V3, V4 |
-| `INVERT` | `0` | 1 = inverte bianco e nero |
 | `ROTATE` | `0` | 180 se il display è montato capovolto |
-| `KEEP_WIFI` | `1` | 1 = il Wi-Fi normale resta acceso e SSH funziona. 0 = il gadget si prende la radio: canale fisso, cattura più pura, niente SSH |
 
-**Modalità manutenzione:** crea un file vuoto chiamato `etere-off` nella
-partizione di boot (anche dal PC). Il gadget non parte e il Wi-Fi resta
-normale. Cancellalo per tornare all'arte.
+Per l'app `etere`:
+
+| Chiave | Default | Significato |
+|---|---|---|
+| `SOURCE` | `auto` | `auto`, `csi`, `rssi`, `scan` (vedi sotto) |
+| `VIEW` | `intensita` | `spettro`, `variazioni`, `intensita`, `mix` |
+| `DITHER` | `bayer` | `floyd` (morbido) o `bayer` (a reticolo) |
+| `EXPOSURE_SECONDS` | `10` | secondi di ascolto tra uno scatto e l'altro |
+| `CLEAN` | `0.6` | 0 = immagine grezza, 1 = molto pulita |
+| `KEEP_WIFI` | `1` | 0 = il gadget si prende la radio (niente SSH) |
+
+**Modalità manutenzione:** un file vuoto chiamato `etere-off` nella
+partizione di boot impedisce al programma di partire.
+
+### Le sorgenti radio di Etere
+
+| Sorgente | Cosa misura | Sul Pi Zero W |
+|---|---|---|
+| `csi` | Channel State Information | Non supportata (Nexmon CSI non ha la patch per il chip bcm43430a1) |
+| `rssi` | modalità monitor su un canale | Serve Nexmon, che supporta solo kernel fino al 6.6 (`install/install-nexmon.sh`, sperimentale) |
+| `scan` | scansioni Wi-Fi normali | Funziona sempre |
+
+Nessuna sorgente legge o conserva indirizzi MAC, nomi di rete o contenuti.
 
 ## Sviluppo sul PC
 
 ```bash
 python3 -m unittest discover tests
-python3 etere/etere.py --source sim --once --out scatto.png
+python3 etere/etere.py --app mandelbrot --once --out frame.png
+python3 etere/etere.py --app tarocchi --out frame.png --web-port 8080
 ```
+
+L'ultimo comando apre anche la pagina di controllo su http://localhost:8080.
+Le immagini delle carte non sono nel repo: senza, compare un segnaposto.
 
 ## Crediti
 
+- Carte dei tarocchi: mazzo **Rider-Waite-Smith** (1909), illustrato da Pamela
+  Colman Smith, pubblico dominio. Scansioni dal progetto
+  [metabismuth/tarot-json](https://github.com/metabismuth/tarot-json).
+  Nomi e parole chiave in italiano scritti per questo progetto.
 - Display: libreria [Waveshare e-Paper](https://github.com/waveshare/e-Paper)
 - Modalità monitor / CSI: [Nexmon](https://nexmon.org) e
   [Nexmon CSI](https://github.com/seemoo-lab/nexmon_csi) di SEEMOO Lab, TU Darmstadt

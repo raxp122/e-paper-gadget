@@ -128,5 +128,80 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(c.float("EXPOSURE_SECONDS"), 10.0)
 
 
+class SaveTest(unittest.TestCase):
+    def test_aggiorna_e_aggiunge(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".conf", delete=False) as f:
+            f.write("# commento\nAPP=tarocchi  # nota\nX=1\n")
+        c = config.Config(path=f.name)
+        c.save(APP="mandelbrot", TAROT_SECONDS=45)
+        text = open(f.name).read()
+        os.unlink(f.name)
+        self.assertIn("# commento", text)
+        self.assertIn("APP=mandelbrot", text)
+        self.assertIn("TAROT_SECONDS=45", text)
+        self.assertEqual(c.str("APP"), "mandelbrot")
+
+
+class TarocchiTest(unittest.TestCase):
+    def test_mazzo_completo(self):
+        from apps import tarocchi as T
+        deck = T.load_deck()
+        self.assertEqual(len(deck), 78)
+        self.assertEqual(sum("maggiore" in c["head"] for c in deck), 22)
+        self.assertEqual(len({c["img"] for c in deck}), 78)
+        for c in deck:
+            self.assertEqual((len(c["up"]), len(c["rev"])), (3, 3), c["name"])
+
+    def test_tutte_le_carte_entrano_nello_schermo(self):
+        from PIL import Image, ImageDraw
+        from apps import tarocchi as T
+        d = ImageDraw.Draw(Image.new("1", (250, 122)))
+        for c in T.load_deck():
+            for rev in (False, True):
+                *_, total, widest = T.fit(d, c, rev)
+                self.assertLessEqual(total, T.H, c["name"])
+                self.assertLessEqual(widest, T.TEXT_W, c["name"])
+
+    def test_frame(self):
+        from apps import tarocchi as T
+        img, wait = T.TarocchiApp(config.Config(path=os.devnull)).frame()
+        self.assertEqual((img.size, img.mode, wait), ((250, 122), "1", 30.0))
+
+
+class MandelbrotTest(unittest.TestCase):
+    def test_viaggio(self):
+        from apps import mandelbrot as M
+        j = M.Journey("incisione")
+        for _ in range(8):
+            g, depth = j.frame()
+            self.assertEqual(g.shape, (122, 250))
+        self.assertGreater(depth, 50)          # e' sceso in profondita'
+        self.assertLess(j.half_width, M.START_HALF_WIDTH)
+
+    def test_stili(self):
+        from apps import mandelbrot as M
+        nu, ins, dist = M.compute(M.START_CENTER, M.START_HALF_WIDTH, 60)
+        self.assertTrue(ins.any() and (~ins).any())
+        for s in M.STYLES:
+            g = M.stylize(nu, ins, dist, M.START_HALF_WIDTH, s)
+            self.assertTrue(((g >= 0) & (g <= 1)).all())
+
+
+class WebTest(unittest.TestCase):
+    def test_pagina_e_impostazioni(self):
+        import web
+        cfg = config.Config(path=os.devnull)
+        page = web.page(web.Controller(cfg, "tarocchi"), "ok")
+        self.assertIn("Tarocchi", page)
+        self.assertIn("/mostra", page)
+        ch = web.apply_settings(cfg, {"MANDEL_SECONDS": ["5"], "TAROT_SECONDS": ["99999"],
+                                      "MANDEL_STYLE": ["china"], "TAROT_REVERSED": ["1"]})
+        self.assertEqual(ch["MANDEL_SECONDS"], "15")
+        self.assertEqual(ch["TAROT_SECONDS"], "3600")
+        self.assertEqual(ch["MANDEL_STYLE"], "china")
+        self.assertEqual((ch["TAROT_REVERSED"], ch["MANDEL_ZOOM_LABEL"]), ("1", "0"))
+        self.assertNotIn("MANDEL_STYLE", web.apply_settings(cfg, {"MANDEL_STYLE": ["<x>"]}))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -250,8 +250,11 @@ class ScanSource:
         sh(["ip", "link", "set", self.iface, "up"])
 
     def _scan(self):
-        for _ in range(3):
-            r = sh(["iw", "dev", self.iface, "scan"], 20)
+        for attempt in range(3):
+            cmd = ["iw", "dev", self.iface, "scan"]
+            if attempt == 2:
+                cmd.append("ap-force")  # quando il gadget fa da rete, se il driver lo permette
+            r = sh(cmd, 20)
             if r.returncode == 0:
                 return parse_iw_scan(r.stdout)
             time.sleep(1)  # spesso "Device or resource busy": riprovo

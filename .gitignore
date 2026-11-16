@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 anteprima*.png
 scatto*.png
+etere/data/tarocchi/cards

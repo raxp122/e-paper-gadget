@@ -9,6 +9,24 @@ import os
 BOOT_DIRS = ("/boot/firmware", "/boot")
 
 DEFAULTS = {
+    # App mostrata all'accensione: mandelbrot | tarocchi | etere
+    "APP": "mandelbrot",
+    # --- Mandelbrot ---
+    "MANDEL_SECONDS": "30",
+    # stile: incisione | china | chiaroscuro
+    "MANDEL_STYLE": "incisione",
+    # 1 = mostra l'ingrandimento nell'angolo
+    "MANDEL_ZOOM_LABEL": "1",
+    # --- Tarocchi ---
+    "TAROT_SECONDS": "30",
+    # 1 = le carte possono uscire capovolte (meta' delle volte)
+    "TAROT_REVERSED": "1",
+    # --- Rete del gadget e pagina di controllo ---
+    "AP_SSID": "raspberry",
+    # almeno 8 caratteri (regola del Wi-Fi WPA2)
+    "AP_PASSWORD": "raspberrypi",
+    "WEB_PORT": "80",
+    # --- Etere (onde Wi-Fi) ---
     # Da dove arriva il segnale: auto | csi | rssi | scan | sim
     "SOURCE": "auto",
     # Canale Wi-Fi da ascoltare (1-13) oppure auto = il piu' trafficato
@@ -60,6 +78,7 @@ class Config:
     def __init__(self, overrides=None, path=None):
         self.values = dict(DEFAULTS)
         path = path or find_boot_file("etere.conf")
+        self.path = path
         if path:
             with open(path, encoding="utf-8") as f:
                 self.values.update(parse(f.read()))
@@ -75,6 +94,54 @@ class Config:
     def bool(self, key):
         return self.values[key].strip().lower() in ("1", "true", "yes", "si", "sì", "on")
 
+    def save(self, **changes):
+        """Cambia valori in memoria e, se c'e' un file, anche sul file."""
+        self.values.update({k.upper(): str(v) for k, v in changes.items()})
+        if self.path and self.path != os.devnull:
+            save_values(self.path, changes)
+
     def channel(self):
         v = self.values["CHANNEL"].strip().lower()
         return None if v == "auto" else int(v)
+
+
+def _boot_mount(path):
+    """Se il file sta sulla partizione di boot montata in sola lettura,
+    ritorna il punto di montaggio (da riaprire in scrittura un attimo)."""
+    for d in BOOT_DIRS:
+        if path.startswith(d + "/") and os.path.ismount(d):
+            return d
+    return None
+
+
+def save_values(path, changes):
+    """Aggiorna o aggiunge righe CHIAVE=valore mantenendo commenti e ordine.
+    Se la partizione di boot e' in sola lettura la riapre in scrittura solo
+    per il tempo della scrittura."""
+    import subprocess
+    lines = []
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    todo = {k.upper(): str(v) for k, v in changes.items()}
+    for i, raw in enumerate(lines):
+        key = raw.split("#", 1)[0].split("=", 1)[0].strip().upper()
+        if "=" in raw.split("#", 1)[0] and key in todo:
+            lines[i] = f"{key}={todo.pop(key)}"
+    lines += [f"{k}={v}" for k, v in todo.items()]
+    text = "\n".join(lines) + "\n"
+    mnt = _boot_mount(path)
+    remounted = False
+    if mnt and not os.access(mnt, os.W_OK):
+        remounted = subprocess.run(["mount", "-o", "remount,rw", mnt]).returncode == 0
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        os.sync()
+    finally:
+        if remounted:
+            subprocess.run(["mount", "-o", "remount,ro", mnt])

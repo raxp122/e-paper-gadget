@@ -1,40 +1,34 @@
 #!/usr/bin/env python3
-"""Etere: una Polaroid dell'etere radio su e-paper.
+"""Etere: un gadget e-paper con piu' app (frattale, tarocchi, onde Wi-Fi).
 
-Ciclo: accensione -> ascolto (esposizione) -> immagine -> refresh completo
--> lo schermo resta fermo mentre si ascolta per lo scatto successivo.
-Niente viene salvato: lo scatto esiste solo sul display.
+All'accensione parte l'app scelta come predefinita. Dal telefono, collegato
+alla rete del gadget, si apre una paginetta per cambiare app e impostazioni.
+A ogni frame lo schermo fa un refresh completo e poi resta fermo: si puo'
+staccare la corrente quando si vuole, tranne mentre lampeggia.
 """
 import argparse
 import logging
-import os
 import sys
 import time
 
-import numpy as np
-
+import apps
 import config
 import display
 import render
 import sources
+import web
 
 log = logging.getLogger("etere")
-NO_SOURCE = 3  # il servizio systemd non riparte in loop con questo codice
-
-
-def wait_for_iface(name, timeout=40):
-    """Al boot il Wi-Fi puo' comparire qualche secondo dopo di noi."""
-    end = time.monotonic() + timeout
-    while not os.path.exists(f"/sys/class/net/{name}") and time.monotonic() < end:
-        time.sleep(1)
 
 
 def args_parser():
-    p = argparse.ArgumentParser(description="Etere - Polaroid radio")
-    p.add_argument("--source", help="auto | csi | rssi | scan | sim")
+    p = argparse.ArgumentParser(description="Etere - gadget e-paper")
+    p.add_argument("--app", help="app da avviare: " + " | ".join(apps.APPS))
+    p.add_argument("--source", help="(app etere) auto | csi | rssi | scan | sim")
     p.add_argument("--out", help="salva in PNG invece di usare il display")
-    p.add_argument("--once", action="store_true", help="un solo scatto e poi esce")
-    p.add_argument("--probe", action="store_true", help="prova le sorgenti e dice quali funzionano")
+    p.add_argument("--once", action="store_true", help="un solo frame e poi esce")
+    p.add_argument("--web-port", type=int, help="porta della pagina di controllo (0 = spenta)")
+    p.add_argument("--probe", action="store_true", help="prova le sorgenti radio")
     p.add_argument("--test-display", action="store_true", help="disegna una schermata di prova")
     p.add_argument("--config", help="file di configurazione alternativo")
     p.add_argument("-v", "--verbose", action="store_true")
@@ -65,58 +59,65 @@ def probe(cfg):
     return 0 if ok else 1
 
 
+def run(cfg, out, ctl, once=False):
+    rot = 180 if cfg.str("ROTATE").strip() == "180" else 0
+    while True:
+        name = ctl.current
+        try:
+            app = apps.create(name, cfg)
+        except Exception as e:  # nome sbagliato o app rotta: non lasciamo lo schermo vuoto
+            log.exception("app %s non avviata", name)
+            out.show(render.message(f"app '{name}'\nnon disponibile\n\n{type(e).__name__}", rot))
+            if name == "mandelbrot":
+                return 1
+            ctl.current = "mandelbrot"
+            continue
+        log.info("app: %s", name)
+        ctl.changed.clear()
+        try:
+            while not ctl.changed.is_set():
+                t0 = time.monotonic()
+                img, interval = app.frame()
+                if ctl.changed.is_set():
+                    break                       # nel frattempo e' stata scelta un'altra app
+                out.show(img.rotate(rot) if rot else img)   # refresh completo + sleep
+                if once:
+                    return 0
+                wait = interval - (time.monotonic() - t0)
+                ctl.changed.wait(max(wait, 0))
+        finally:
+            app.close()
+
+
 def main(argv=None):
     a = args_parser().parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if a.verbose else logging.INFO,
                         format="%(asctime)s %(name)s: %(message)s")
-    overrides = {"SOURCE": a.source} if a.source else None
+    overrides = {}
+    if a.source:
+        overrides["SOURCE"] = a.source
     cfg = config.Config(overrides, path=a.config)
-    rot = 180 if cfg.str("ROTATE").strip() == "180" else 0
 
     if a.probe:
         return probe(cfg)
 
     if a.test_display:
-        display.make(cfg, a.out).show(render.test_pattern(rot))
+        display.make(cfg, a.out).show(render.test_pattern())
         return 0
 
     if not a.out and config.find_boot_file("etere-off"):
         log.info("trovato etere-off sulla partizione di boot: modalita' manutenzione, esco")
         return 0
 
-    out = display.make(cfg, a.out)
-    if cfg.str("SOURCE").lower() != "sim":
-        wait_for_iface(cfg.str("IFACE"))
-    try:
-        src = sources.choose(cfg)
-    except sources.SourceError as e:
-        log.error("nessuna sorgente: %s", e)
-        out.show(render.message("etere\n\nnessuna radio in ascolto", rot))
-        return NO_SOURCE
-
-    clean = cfg.float("CLEAN")
-    invert = cfg.bool("INVERT")
-    view = cfg.str("VIEW").strip().lower()
-    method = cfg.str("DITHER").strip().lower()
-    try:  # nome sbagliato in etere.conf: lo dico sullo schermo invece di crashare
-        render.apply_view(np.zeros((2, 2)), view)
-        render.dither(render.message(""), method)
-    except ValueError as e:
-        log.error("%s", e)
-        out.show(render.message(f"etere.conf:\nVIEW={view}  DITHER={method}\nvalore non valido", rot))
-        return NO_SOURCE
-    exposure = cfg.float("FIRST_EXPOSURE_SECONDS")
-    while True:
-        t = time.monotonic()
-        matrix = src.capture(exposure)          # lo schermo intanto e' fermo
-        img = render.render(matrix, clean * src.clean_factor, src.blur, invert, rot, view, method)
-        out.show(img)                           # refresh completo + sleep del pannello
-        log.info("scatto (%s) in %.1fs", src.name, time.monotonic() - t)
-        if a.once:
-            break
-        exposure = cfg.float("EXPOSURE_SECONDS")
-    src.close()
-    return 0
+    start_app = a.app or ("etere" if a.source else cfg.str("APP").strip().lower())
+    if start_app not in apps.APPS:
+        log.error("app sconosciuta '%s', uso mandelbrot", start_app)
+        start_app = "mandelbrot"
+    ctl = web.Controller(cfg, start_app)
+    port = a.web_port if a.web_port is not None else (0 if a.out else int(cfg.str("WEB_PORT")))
+    if port:
+        web.start(ctl, port)
+    return run(cfg, display.make(cfg, a.out), ctl, a.once)
 
 
 if __name__ == "__main__":

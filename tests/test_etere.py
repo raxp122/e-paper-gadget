@@ -1,6 +1,7 @@
 """Test eseguibili ovunque (anche sul PC):  python3 -m unittest discover tests"""
 import os
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -324,6 +325,66 @@ class DisplayTest(unittest.TestCase):
         c = [x for x in d.epd.calls if x != "init"]
         self.assertEqual(c, ["base", "partial", "partial", "partial", "base", "base", "full", "sleep"])
         self.assertFalse(d.awake)
+
+
+class ReteTest(unittest.TestCase):
+    """Simula NetworkManager: `states` e' la sequenza di (stato, connessione)
+    che nmcli restituisce; i comandi 'up'/'down' della rete del gadget la
+    accendono e spengono davvero nel finto stato."""
+
+    def _fake(self, client_seq, stations=0):
+        calls, t = [], [0.0]
+        st = {"ap": False, "i": 0}
+
+        def run(cmd, timeout=60):
+            calls.append(cmd)
+            if cmd[:2] == ["nmcli", "-t"]:
+                if st["ap"]:
+                    out = "wlan0:connected:etere-ap"
+                else:
+                    seq = client_seq[min(st["i"], len(client_seq) - 1)]
+                    st["i"] += 1
+                    out = f"wlan0:{seq}"
+                return subprocess.CompletedProcess(cmd, 0, "eth0:unavailable:\n" + out + "\n", "")
+            if cmd[:3] == ["nmcli", "connection", "up"]:
+                st["ap"] = True
+            if cmd[:3] == ["nmcli", "connection", "down"]:
+                st["ap"] = False
+            if cmd[:2] == ["iw", "dev"]:
+                return subprocess.CompletedProcess(cmd, 0, "Station aa\n" * stations, "")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+        def sleep(s):
+            t[0] += s
+        return run, sleep, (lambda: t[0]), calls
+
+    def test_hotspot_trovato(self):
+        import rete
+        run, sleep, clock, calls = self._fake(["connecting:", "connected:iPhone"])
+        ev = rete.supervise("wlan0", 90, 300, run, sleep, clock, rounds=1)
+        self.assertEqual(ev, ["client"])
+        self.assertNotIn(["nmcli", "connection", "up", rete.AP], calls)
+
+    def test_nessuna_rete_accende_la_propria_e_poi_riprova(self):
+        import rete
+        run, sleep, clock, calls = self._fake(["disconnected:"])
+        ev = rete.supervise("wlan0", 90, 300, run, sleep, clock, rounds=3)
+        self.assertEqual(ev[:3], ["ap", "riprovo", "ap"])
+        self.assertIn(["nmcli", "connection", "down", rete.AP], calls)
+
+    def test_non_spegne_se_qualcuno_e_collegato(self):
+        import rete
+        run, sleep, clock, calls = self._fake(["disconnected:"], stations=1)
+        ev = rete.supervise("wlan0", 90, 300, run, sleep, clock, rounds=3)
+        self.assertEqual(ev, ["ap", "ap", "ap"])
+        self.assertNotIn(["nmcli", "connection", "down", rete.AP], calls)
+
+    def test_torna_all_hotspot(self):
+        import rete
+        # rete del gadget, nessuno collegato -> la spegne -> l'hotspot c'e'
+        run, sleep, clock, calls = self._fake(["disconnected:"] * 31 + ["connected:iPhone"])
+        ev = rete.supervise("wlan0", 90, 300, run, sleep, clock, rounds=3)
+        self.assertEqual(ev, ["ap", "riprovo", "client"])
 
 
 class WebTest(unittest.TestCase):

@@ -64,15 +64,18 @@ echo "==> Rete del gadget: \"$SSID\""
 if [ "${#PSK}" -lt 8 ] || [ "${#PSK}" -gt 63 ]; then
     echo "!! AP_PASSWORD deve avere da 8 a 63 caratteri (regola del Wi-Fi WPA2). Rete non configurata."
 else
-    # Il gadget crea la sua rete solo se all'accensione non trova una rete
-    # conosciuta (per esempio l'hotspot del telefono): priorita' piu' bassa.
+    # La rete la accende il programma (etere/rete.py) se all'accensione non
+    # trova una rete conosciuta: qui NetworkManager non la avvia da solo.
+    # Canale fisso e PMF disattivato: con il chip del Pi Zero W in modalita'
+    # rete sono le impostazioni piu' affidabili.
     nmcli connection delete etere-ap >/dev/null 2>&1 || true
     nmcli connection add type wifi ifname wlan0 con-name etere-ap ssid "$SSID" \
-        connection.autoconnect yes connection.autoconnect-priority -100 \
-        802-11-wireless.mode ap 802-11-wireless.band bg \
+        connection.autoconnect no \
+        802-11-wireless.mode ap 802-11-wireless.band bg 802-11-wireless.channel 6 \
         ipv4.method shared ipv4.addresses 10.42.0.1/24 ipv6.method disabled \
-        wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PSK" \
-        wifi-sec.proto rsn wifi-sec.pairwise ccmp wifi-sec.group ccmp >/dev/null
+        wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PSK" wifi-sec.pmf disable \
+        wifi-sec.proto rsn wifi-sec.pairwise ccmp wifi-sec.group ccmp
+    echo "    rete configurata (si accende da sola se all'avvio non trova l'hotspot)"
     # "Captive portal": ogni nome risponde con l'indirizzo del gadget, cosi'
     # il telefono apre da solo la pagina di controllo
     mkdir -p /etc/NetworkManager/dnsmasq-shared.d

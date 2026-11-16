@@ -12,6 +12,19 @@ completo ogni 30 aggiornamenti per cancellare gli aloni. Puoi staccare la
 corrente in qualsiasi momento **tranne durante un aggiornamento**: l'ultima
 immagine resta sull'e-paper finché non lo riaccendi.
 
+| | |
+|---|---|
+| ![Viaggio nel frattale](docs/img/mandelbrot.png) | ![Tarocchi](docs/img/tarocchi.png) |
+| **Viaggio nel frattale** | **Tarocchi** |
+| ![Gioco della vita](docs/img/vita.png) | ![Labirinto](docs/img/labirinto.png) |
+| **Gioco della vita** | **Labirinto** |
+| ![Etere](docs/img/etere.png) | ![Tarocchi, carta capovolta](docs/img/tarocchi-capovolta.png) |
+| **Etere** (onde Wi-Fi) | **Tarocchi**, carta capovolta |
+
+*Le immagini sono generate con lo stesso codice che gira sul Pi
+(`python3 tools/gallery.py`), alla risoluzione reale del display ingrandita
+3 volte.*
+
 ## Le app
 
 | App | Cosa fa |
@@ -23,8 +36,8 @@ immagine resta sull'e-paper finché non lo riaccendi.
 | `foto` | **Foto.** Mostra l'ultima foto caricata dalla pagina di controllo, trasformata in bianco e nero. Si salva solo la versione finale da pochi KB (`etere-foto.png` accanto a `etere.conf`), che sostituisce sempre la precedente; l'originale non viene mai scritto su disco. |
 | `etere` | **Etere.** Il ritratto delle reti Wi-Fi intorno al gadget: si vedono soprattutto i cambiamenti, per esempio qualcuno che passa. Non funziona mentre il gadget crea la sua rete, perché la radio è occupata. |
 
-Le estrazioni casuali usano il generatore casuale del sistema. Nessuna app
-salva nulla: tutto vive solo sullo schermo.
+Le estrazioni casuali usano il generatore casuale del sistema. A parte la
+foto caricata, nessuna app salva nulla: tutto vive solo sullo schermo.
 
 Per aggiungere un'app: un modulo in `etere/apps/` con `name`, `title`,
 `frame()` (che ritorna un'immagine 1-bit 250×122 e i secondi di attesa) e
@@ -59,6 +72,17 @@ Funziona anche l'SSH: `ssh <utente>@10.42.0.1`.
 > la conosce chiunque lo legga. Cambia `AP_PASSWORD` in `etere.conf` (almeno 8
 > caratteri), rilancia `install.sh`, e cambia anche la password dell'utente
 > con `passwd`.
+
+## Hardware
+
+- **Raspberry Pi Zero W** (v1.1, chip Wi-Fi bcm43430a1, solo 2,4 GHz)
+- **Waveshare 2.13" e-Paper HAT** (Rev 2.1, pannello V3): 250×122 pixel,
+  bianco e nero, si innesta direttamente sui 40 pin
+- una microSD da 8 GB o più
+- alimentazione micro-USB: caricatore o powerbank
+
+Niente saldature: il display si innesta sul Pi. Con un pannello V2 o V4 basta
+cambiare `EPD=` nella configurazione.
 
 ## Installazione
 
@@ -169,6 +193,18 @@ partizione di boot impedisce al programma di partire.
 
 Nessuna sorgente legge o conserva indirizzi MAC, nomi di rete o contenuti.
 
+## Problemi frequenti
+
+| Problema | Soluzione |
+|---|---|
+| Lo schermo resta bianco | Prova `EPD=V2` o `EPD=V4` in `etere.conf`, poi `--test-display`. Controlla che il HAT sia inserito su tutti i 40 pin. |
+| Il Pi non si collega all'hotspot dell'iPhone | Attiva *Massimizza compatibilità*: il Pi Zero W vede solo i 2,4 GHz. |
+| SSH risponde "Connection refused" | Al primo avvio aspetta 3-5 minuti. Se non basta, crea un file vuoto `ssh` nella partizione `bootfs`. |
+| `apt` si interrompe a metà download | Succede con gli hotspot: rilancia `install.sh`, riparte da dove si era fermato. |
+| La pagina non si apre da sola | Apri `http://10.42.0.1` nel browser. Su iPhone, se nella finestrina non riesci a scegliere una foto, chiudila scegliendo di restare collegato senza internet e usa Safari. |
+| Etere dice "la radio non è disponibile" | Con la rete `raspberry` attiva la radio è occupata: collega il gadget all'hotspot. |
+| Dopo un aggiornamento non cambia nulla | Serve `sudo systemctl restart etere`, oppure stacca e riattacca. |
+
 ## Sviluppo sul PC
 
 ```bash
@@ -180,6 +216,36 @@ python3 etere/etere.py --app tarocchi --out frame.png --web-port 8080
 L'ultimo comando apre anche la pagina di controllo su http://localhost:8080.
 Le immagini delle carte non sono nel repo: senza, compare un segnaposto.
 
+```bash
+python3 tools/preview.py anteprima.png   # anteprima delle sorgenti di Etere
+python3 tools/gallery.py                 # rigenera le immagini del README
+```
+
+## Struttura del progetto
+
+```
+etere/
+  etere.py        programma principale: app, display, pagina web
+  config.py       lettura e salvataggio di etere.conf
+  display.py      pannello Waveshare (completo / parziale) o PNG
+  render.py       dalla matrice all'immagine 1-bit (viste, dithering)
+  web.py          pagina di controllo per il telefono
+  sources.py      sorgenti radio di Etere (csi, rssi, scan, sim)
+  radiotap.py     lettura della potenza dei frame in modalità monitor
+  apps/           mandelbrot, tarocchi, vita, labirinto, foto, radio (etere)
+  data/           nomi e significati dei tarocchi
+install/
+  install.sh      installazione e aggiornamento
+  etere.conf      configurazione predefinita
+  etere.service   avvio automatico (systemd)
+  readonly.sh     sistema in sola lettura
+  install-nexmon.sh  modalità monitor (sperimentale)
+tests/            test automatici (python3 -m unittest discover tests)
+tools/            anteprime e immagini del README
+docs/img/         immagini del README
+```
+
+
 ## Crediti
 
 - Carte dei tarocchi: mazzo **Rider-Waite-Smith** (1909), illustrato da Pamela
@@ -189,3 +255,9 @@ Le immagini delle carte non sono nel repo: senza, compare un segnaposto.
 - Display: libreria [Waveshare e-Paper](https://github.com/waveshare/e-Paper)
 - Modalità monitor / CSI: [Nexmon](https://nexmon.org) e
   [Nexmon CSI](https://github.com/seemoo-lab/nexmon_csi) di SEEMOO Lab, TU Darmstadt
+
+## Licenza
+
+Codice sotto licenza [MIT](LICENSE). Le scansioni delle carte Rider-Waite-Smith
+sono di pubblico dominio e non sono incluse nel repo: le scarica
+`install.sh`.

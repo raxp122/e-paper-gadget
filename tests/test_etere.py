@@ -95,6 +95,23 @@ class RenderTest(unittest.TestCase):
     def test_matrice_costante(self):
         self.assertEqual(render.render(np.zeros((10, 10))).size, (250, 122))
 
+    def test_viste(self):
+        m = np.vstack([np.full(20, 5.0), np.r_[np.zeros(10), np.ones(10)]])
+        self.assertTrue(np.allclose(render.apply_view(m, "variazioni")[0], 0))
+        self.assertTrue((render.apply_view(m, "intensita") >= 0).all())
+        for v in render.VIEWS:
+            for d in render.DITHERS:
+                img = render.render(m, view=v, method=d)
+                self.assertEqual((img.size, img.mode), ((250, 122), "1"))
+        with self.assertRaises(ValueError):
+            render.apply_view(m, "boh")
+
+    def test_bayer_grigio_meta(self):
+        from PIL import Image
+        img = render.dither(Image.new("L", (64, 64), 128), "bayer")
+        black = sum(1 for p in img.getdata() if p == 0)
+        self.assertAlmostEqual(black / 4096, 0.5, delta=0.02)
+
     def test_messaggio(self):
         self.assertEqual(render.message("ciao\nmondo").size, (250, 122))
 

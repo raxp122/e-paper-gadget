@@ -11,6 +11,8 @@ import os
 import sys
 import time
 
+import numpy as np
+
 import config
 import display
 import render
@@ -94,11 +96,20 @@ def main(argv=None):
 
     clean = cfg.float("CLEAN")
     invert = cfg.bool("INVERT")
+    view = cfg.str("VIEW").strip().lower()
+    method = cfg.str("DITHER").strip().lower()
+    try:  # nome sbagliato in etere.conf: lo dico sullo schermo invece di crashare
+        render.apply_view(np.zeros((2, 2)), view)
+        render.dither(render.message(""), method)
+    except ValueError as e:
+        log.error("%s", e)
+        out.show(render.message(f"etere.conf:\nVIEW={view}  DITHER={method}\nvalore non valido", rot))
+        return NO_SOURCE
     exposure = cfg.float("FIRST_EXPOSURE_SECONDS")
     while True:
         t = time.monotonic()
         matrix = src.capture(exposure)          # lo schermo intanto e' fermo
-        img = render.render(matrix, clean * src.clean_factor, src.blur, invert, rot)
+        img = render.render(matrix, clean * src.clean_factor, src.blur, invert, rot, view, method)
         out.show(img)                           # refresh completo + sleep del pannello
         log.info("scatto (%s) in %.1fs", src.name, time.monotonic() - t)
         if a.once:
